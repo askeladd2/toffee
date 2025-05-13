@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Telegram Reels Mini App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background-color: #000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    #app {
+      height: 100%;
+      width: 100%;
+      position: relative;
+    }
+    
+    #reels-container {
+      height: 100%;
+      width: 100%;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      position: relative;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .reel {
+      height: 100vh;
+      width: 100%;
+      position: relative;
+      scroll-snap-align: start;
+      overflow: hidden;
+      background-color: #000;
+    }
+    
+    .video-container {
+      height: 100%;
+      width: 100%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+    
+    .controls-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 20px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    
+    .progress-bar-container {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      overflow: hidden;
+      pointer-events: auto;
+      margin-bottom: 15px;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #FF0000;
+      border-radius: 2px;
+    }
+    
+    .action-buttons {
+      position: absolute;
+      right: 15px;
+      bottom: 90px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      z-index: 20;
+    }
+    
+    .action-button {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: transform 0.2s ease;
+    }
+    
+    .action-button:active {
+      transform: scale(0.9);
+    }
+    
+    .action-button.liked {
+      background: rgba(255, 0, 0, 0.8);
+    }
+    
+    .loader {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 40px;
+      height: 40px;
+      margin: -20px 0 0 -20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top: 3px solid #FF0000;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      z-index: 5;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .video-info {
+      position: absolute;
+      bottom: 70px;
+      left: 15px;
+      color: white;
+      max-width: 70%;
+      z-index: 20;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+    
+    .video-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    
+  
+    /* Add mute/unmute button */
+    .mute-button {
+      position: absolute;
+      top: 20px;
+      right: 15px;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      z-index: 20;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    
+    .play-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 15;
+      pointer-events: none;
+    }
+    
+    .play-icon {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .play-icon svg {
+      width: 30px;
+      height: 30px;
+      fill: white;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="reels-container">
+      <!-- Reels will be dynamically inserted here -->
+    </div>
+  </div>
+
+  <script>
+    // Add your video links here
+    const videoData = [
+      {
+        src: 
+    'https://xcdn1.nosofiles.com/d/b/6/0/e/output_67bab70c-9d82-42a8-814d-6598436e06bd_high.mp4?verify=1746976203-OgIjq4hBb23rcgdXdsLeXTIff6YMX8UGsdA%2BEUdaqMo%3D',
+        title: "Video 1",
+       
+      },
+      {
+        src: 'https://xcdn1.nosofiles.com/7/c/9/7/1/output_67b953aa-46f7-4f23-b5e3-b9be54f179c7_high.mp4?verify=1745674131-3OdQA4RdzRP0bIxY0TfKfFTQQguXNAkrOAXhz48Tkc8%3D',
+        title: "Video 2",
+       
+      },
+      {
+        src: "https://xcdn1.nosofiles.com/0/4/c/e/9/output_67bb2d73-ea24-41e9-928f-95667c69ec40_high.mp4?verify=1746970056-XWoSfH%2B1edQUk6oxTqGGo3hylKkp6OVamBEcw0v6wgk%3D",
+        title: "Video 3",
+       
+      }
+      // Add more videos as needed
+    ];
+    
+    const reelsContainer = document.getElementById('reels-container');
+    const allVideos = [];
+    let currentPlayingIndex = -1;
+    let isMuted = false;
+    
+    // Create reels from video data
+    function createReels() {
+      videoData.forEach((data, index) => {
+        // Create reel element
+        const reel = document.createElement('div');
+        reel.className = 'reel';
+        reel.id = `reel-${index}`;
+        
+        // Create video container
+        const videoContainer = document.createElement('div');
+        videoContainer.className = 'video-container';
+        
+        // Create video element
+        const video = document.createElement('video');
+        video.src = data.src;
+        video.muted = isMuted;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+        video.preload = 'metadata';
+        video.loop = true;
+        
+        // Create loader
+        const loader = document.createElement('div');
+        loader.className = 'loader';
+        
+        // Create play overlay
+        const playOverlay = document.createElement('div');
+        playOverlay.className = 'play-overlay';
+        playOverlay.innerHTML = `
+          <div class="play-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        `;
+        
+        // Create video info
+        const videoInfo = document.createElement('div');
+        videoInfo.className = 'video-info';
+        videoInfo.innerHTML = `
+          <div class="video-title">${data.title}</div>
+        `;
+        
+        // Create action buttons
+        const actionButtons = document.createElement('div');
+        actionButtons.className = 'action-buttons';
+        actionButtons.innerHTML = `
+          <div class="action-button like-button">❤️</div>
+          <div class="action-button share-button">➡️</div>
+        `;
+        
+        // Create mute button
+        const muteButton = document.createElement('div');
+        muteButton.className = 'mute-button';
+        muteButton.innerHTML = isMuted ? '🔇' : '🔊';
+        muteButton.addEventListener('click', () => {
+          isMuted = !isMuted;
+          allVideos.forEach(v => v.muted = isMuted);
+          muteButton.innerHTML = isMuted ? '🔇' : '🔊';
+        });
+        
+        // Create controls overlay
+        const controlsOverlay = document.createElement('div');
+        controlsOverlay.className = 'controls-overlay';
+        
+        // Create progress bar
+        const progressBarContainer = document.createElement('div');
+        progressBarContainer.className = 'progress-bar-container';
+        
+        const progressBar = document.createElement('div');
+        progressBar.className = 'progress-bar';
+        
+        progressBarContainer.appendChild(progressBar);
+        controlsOverlay.appendChild(progressBarContainer);
+        
+        // Make progress bar interactive
+        progressBarContainer.addEventListener('click', (e) => {
+          const rect = progressBarContainer.getBoundingClientRect();
+          const pos = (e.clientX - rect.left) / rect.width;
+          video.currentTime = pos * video.duration;
+        });
+        
+        // Add like button functionality
+        const likeButton = actionButtons.querySelector('.like-button');
+        likeButton.addEventListener('click', () => {
+          likeButton.classList.toggle('liked');
+        });
+        
+        // Add comment button functionality
+       
+        
+        // Add share button functionality
+        const shareButton = actionButtons.querySelector('.share-button');
+        shareButton.addEventListener('click', () => {
+          if (navigator.share) {
+            navigator.share({
+              title: data.title,
+             
+              url: window.location.href
+            }).catch(err => console.log('Error sharing:', err));
+          } else {
+            alert('Share feature would go here');
+          }
+        });
+        
+        // Video event listeners
+        video.addEventListener('timeupdate', () => {
+          if (video.duration) {
+            const progress = (video.currentTime / video.duration) * 100;
+            progressBar.style.width = `${progress}%`;
+          }
+        });
+        
+        video.addEventListener('waiting', () => {
+          loader.style.display = 'block';
+        });
+        
+        video.addEventListener('canplay', () => {
+          loader.style.display = 'none';
+        });
+        
+        video.addEventListener('pause', () => {
+          playOverlay.style.opacity = '1';
+        });
+        
+        video.addEventListener('play', () => {
+          playOverlay.style.opacity = '0';
+        });
+        
+        // Tap to play/pause
+        videoContainer.addEventListener('click', () => {
+          if (video.paused) {
+            video.play().catch(err => console.log('Play error:', err));
+          } else {
+            video.pause();
+          }
+        });
+        
+        // Add everything to the DOM
+        videoContainer.appendChild(video);
+        videoContainer.appendChild(loader);
+        videoContainer.appendChild(playOverlay);
+        
+        reel.appendChild(videoContainer);
+        reel.appendChild(videoInfo);
+        reel.appendChild(actionButtons);
+        reel.appendChild(muteButton);
+        reel.appendChild(controlsOverlay);
+        
+        reelsContainer.appendChild(reel);
+        allVideos.push(video);
+      });
+    }
+    
+    // Initialize the app
+    function initApp() {
+      createReels();
+      
+      // Set up scroll detection to play/pause videos
+      function handleScroll() {
+        const viewportHeight = window.innerHeight;
+        const scrollTop = reelsContainer.scrollTop;
+        
+        // Calculate which video should be visible based on scroll position
+        const currentIndex = Math.round(scrollTop / viewportHeight);
+        
+        // If index changed, update playing video
+        if (currentIndex !== currentPlayingIndex && currentIndex >= 0 && currentIndex < allVideos.length) {
+          // Pause currently playing video
+          if (currentPlayingIndex >= 0 && currentPlayingIndex < allVideos.length) {
+            allVideos[currentPlayingIndex].pause();
+          }
+          
+          // Play new video
+          currentPlayingIndex = currentIndex;
+          const videoToPlay = allVideos[currentPlayingIndex];
+          videoToPlay.play().catch(err => console.log('Autoplay error:', err));
+        }
+      }
+      
+      // Add scroll event listener with debounce
+      let scrollTimeout;
+      reelsContainer.addEventListener('scroll', () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(handleScroll, 50);
+      });
+      
+      // Manually trigger scroll once on load to play the first video
+      setTimeout(() => {
+        handleScroll();
+        
+        // Preload next video
+        if (allVideos.length > 1) {
+          allVideos[1].load();
+        }
+      }, 500);
+      
+      // Handle device orientation changes
+      window.addEventListener('resize', handleScroll);
+      
+      // Add touch scroll detection for mobile
+      let touchStartY = 0;
+      reelsContainer.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+      });
+      
+      reelsContainer.addEventListener('touchend', (e) => {
+        const touchEndY = e.changedTouches[0].clientY;
+        const diff = touchStartY - touchEndY;
+        
+        // If significant swipe, move to next/previous video
+        if (Math.abs(diff) > 50) {
+          const direction = diff > 0 ? 1 : -1;
+          const targetIndex = currentPlayingIndex + direction;
+          
+          if (targetIndex >= 0 && targetIndex < allVideos.length) {
+            reelsContainer.scrollTo({
+              top: targetIndex * window.innerHeight,
+              behavior: 'smooth'
+            });
+          }
+        }
+      });
+    }
+    
+    // Run the app on load
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
