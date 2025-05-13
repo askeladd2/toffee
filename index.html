@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>Telegram Reels Mini App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- Import Telegram WebApp API -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     * {
       margin: 0;
@@ -155,7 +157,6 @@
       margin-bottom: 5px;
     }
     
-  
     /* Add mute/unmute button */
     .mute-button {
       position: absolute;
@@ -205,6 +206,30 @@
       height: 30px;
       fill: white;
     }
+
+    /* Link button styles */
+    .link-button {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 8px 16px;
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+      z-index: 20;
+      cursor: pointer;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .link-button:active {
+      background: rgba(255, 255, 255, 0.3);
+    }
   </style>
 </head>
 <body>
@@ -215,27 +240,49 @@
   </div>
 
   <script>
+    // Initialize Telegram WebApp
+    const telegram = window.Telegram.WebApp;
+    telegram.expand(); // Expand to full screen
+    
+    // Parse URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoParam = urlParams.get('video');
+    
     // Add your video links here
-    const videoData = [
+    let videoData = [
       {
-        src: 
-    'https://xcdn1.nosofiles.com/d/b/6/0/e/output_67bab70c-9d82-42a8-814d-6598436e06bd_high.mp4?verify=1746976203-OgIjq4hBb23rcgdXdsLeXTIff6YMX8UGsdA%2BEUdaqMo%3D',
+        src: 'https://xcdn1.nosofiles.com/d/b/6/0/e/output_67bab70c-9d82-42a8-814d-6598436e06bd_high.mp4?verify=1746976203-OgIjq4hBb23rcgdXdsLeXTIff6YMX8UGsdA%2BEUdaqMo%3D',
         title: "Video 1",
-       
+        actionLink: "https://t.me/your_bot?start=video1" // Add your bot link here
       },
       {
         src: 'https://xcdn1.nosofiles.com/7/c/9/7/1/output_67b953aa-46f7-4f23-b5e3-b9be54f179c7_high.mp4?verify=1745674131-3OdQA4RdzRP0bIxY0TfKfFTQQguXNAkrOAXhz48Tkc8%3D',
         title: "Video 2",
-       
+        actionLink: "https://t.me/your_bot?start=video2"
       },
       {
         src: "https://xcdn1.nosofiles.com/0/4/c/e/9/output_67bb2d73-ea24-41e9-928f-95667c69ec40_high.mp4?verify=1746970056-XWoSfH%2B1edQUk6oxTqGGo3hylKkp6OVamBEcw0v6wgk%3D",
         title: "Video 3",
-       
+        actionLink: "https://t.me/your_bot?start=video3"
       }
       // Add more videos as needed
     ];
     
+    // If a specific video is requested via URL parameter, prioritize it
+    if (videoParam) {
+      try {
+        const decodedVideoUrl = decodeURIComponent(videoParam);
+        // Add the passed video to the beginning of the list
+        videoData.unshift({
+          src: decodedVideoUrl,
+          title: "Shared Video",
+          actionLink: "https://t.me/your_bot?start=shared"
+        });
+      } catch (e) {
+        console.error("Error parsing video parameter:", e);
+      }
+    }
+
     const reelsContainer = document.getElementById('reels-container');
     const allVideos = [];
     let currentPlayingIndex = -1;
@@ -292,6 +339,18 @@
           <div class="action-button share-button">➡️</div>
         `;
         
+        // Create link button (new)
+        if (data.actionLink) {
+          const linkButton = document.createElement('div');
+          linkButton.className = 'link-button';
+          linkButton.innerHTML = '💬 Open in Chat';
+          linkButton.addEventListener('click', () => {
+            // Use Telegram's openTelegramLink function
+            openTelegramLink(data.actionLink);
+          });
+          reel.appendChild(linkButton);
+        }
+        
         // Create mute button
         const muteButton = document.createElement('div');
         muteButton.className = 'mute-button';
@@ -329,16 +388,30 @@
           likeButton.classList.toggle('liked');
         });
         
-        // Add comment button functionality
-       
-        
         // Add share button functionality
         const shareButton = actionButtons.querySelector('.share-button');
         shareButton.addEventListener('click', () => {
-          if (navigator.share) {
+          if (telegram && telegram.ready) {
+            // Use Telegram's native sharing
+            telegram.showPopup({
+              title: 'Share this video',
+              message: `Check out this video: ${data.title}`,
+              buttons: [
+                {type: 'default', text: 'Share', id: 'share'},
+                {type: 'cancel'}
+              ]
+            }, function(buttonId) {
+              if (buttonId === 'share') {
+                const shareUrl = `https://toffee-smoky.vercel.app/?video=${encodeURIComponent(data.src)}`;
+                telegram.shareUrl({
+                  url: shareUrl,
+                  text: `Check out this video: ${data.title}`
+                });
+              }
+            });
+          } else if (navigator.share) {
             navigator.share({
               title: data.title,
-             
               url: window.location.href
             }).catch(err => console.log('Error sharing:', err));
           } else {
@@ -393,6 +466,17 @@
         reelsContainer.appendChild(reel);
         allVideos.push(video);
       });
+    }
+    
+    // Function to open links in Telegram
+    function openTelegramLink(url) {
+      if (telegram && telegram.ready) {
+        // Open the link using Telegram's API
+        telegram.openLink(url);
+      } else {
+        // Fallback for when not in Telegram
+        window.location.href = url;
+      }
     }
     
     // Initialize the app
@@ -464,6 +548,14 @@
           }
         }
       });
+
+      // Handle back button for Telegram
+      if (telegram && telegram.ready) {
+        telegram.BackButton.show();
+        telegram.BackButton.onClick(() => {
+          telegram.close();
+        });
+      }
     }
     
     // Run the app on load
